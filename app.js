@@ -15,6 +15,8 @@ let totalChunks = 0;         // 資料區塊總數
 let loadedChunks = 0;        // 已載入區塊數
 let manifest = null;         // 存放 manifest 資訊
 
+let geminiApiKey = localStorage.getItem('gemini_api_key') || '';
+
 // 搜尋條件快取
 const searchCriteria = {
     docNum: '',
@@ -36,6 +38,22 @@ const themeToggleBtn = document.getElementById('theme-toggle');
 const loadingWidget = document.getElementById('loading-widget');
 const loadingStatusText = document.getElementById('loading-status-text');
 const progressBar = document.getElementById('progress-bar');
+
+// AI 解答博士 DOM 元素
+const tabStandard = document.getElementById('tab-standard');
+const tabAi = document.getElementById('tab-ai');
+const standardSearchContainer = document.getElementById('standard-search-container');
+const aiSearchContainer = document.getElementById('ai-search-container');
+const aiQuestionInput = document.getElementById('ai-question');
+const btnAiSubmit = document.getElementById('btn-ai-submit');
+const aiGuideContainer = document.getElementById('ai-guide-container');
+
+// API Modal Elements
+const apiKeyConfigBtn = document.getElementById('api-key-config');
+const apiModal = document.getElementById('api-modal');
+const modalClose = document.getElementById('modal-close');
+const apiKeyInput = document.getElementById('api-key-input');
+const btnSaveKey = document.getElementById('btn-save-key');
 
 // === 初始化設定 ===
 document.addEventListener('DOMContentLoaded', () => {
@@ -79,6 +97,7 @@ function setupEventListeners() {
     // 表單重設
     btnReset.addEventListener('click', () => {
         searchForm.reset();
+        aiGuideContainer.innerHTML = ''; // 清除 AI 導讀卡片
         performSearch(); // 重設後自動搜尋空條件以還原全部資料
     });
 
@@ -88,6 +107,23 @@ function setupEventListeners() {
         currentPage = 1;
         renderResults();
     });
+
+    // Tab 切換
+    tabStandard.addEventListener('click', () => switchTab('standard'));
+    tabAi.addEventListener('click', () => switchTab('ai'));
+
+    // API Modal 開關與儲存
+    apiKeyConfigBtn.addEventListener('click', openApiModal);
+    modalClose.addEventListener('click', closeApiModal);
+    btnSaveKey.addEventListener('click', saveApiKey);
+    
+    // 點擊 Modal 外部也可關閉
+    apiModal.addEventListener('click', (e) => {
+        if (e.target === apiModal) closeApiModal();
+    });
+
+    // AI 解答博士提交
+    btnAiSubmit.addEventListener('click', handleAiSearch);
 }
 
 // === 資料載入機制 ===
@@ -470,4 +506,200 @@ function formatAndHighlightContent(rawContent, keyword) {
         formatted = highlightKeyword(formatted, keyword);
     }
     return formatted.trim();
+}
+
+// === AI 解答博士 核心邏輯 ===
+
+// 1. Tab 切換機制
+function switchTab(tabType) {
+    if (tabType === 'standard') {
+        tabStandard.classList.add('active');
+        tabAi.classList.remove('active');
+        standardSearchContainer.classList.remove('d-none');
+        aiSearchContainer.classList.add('d-none');
+    } else {
+        tabStandard.classList.remove('active');
+        tabAi.classList.add('active');
+        standardSearchContainer.classList.add('d-none');
+        aiSearchContainer.classList.remove('d-none');
+        aiQuestionInput.focus();
+    }
+}
+
+// 2. API Key 設定彈窗控制
+function openApiModal() {
+    apiKeyInput.value = geminiApiKey;
+    apiModal.classList.add('open');
+}
+
+function closeApiModal() {
+    apiModal.classList.remove('open');
+}
+
+function saveApiKey() {
+    const key = apiKeyInput.value.trim();
+    geminiApiKey = key;
+    localStorage.setItem('gemini_api_key', key);
+    closeApiModal();
+    alert('API 金鑰已儲存！');
+}
+
+// 3. 呼叫 Google Gemini API 進行語意分析
+async function callGeminiAPI(question) {
+    const model = 'gemini-1.5-flash';
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`;
+
+    const prompt = `你是一位專業的台灣政府採購法專家。請分析使用者提出的口語問題，提取出最相關的搜尋條件。
+    
+請嚴格以下列的 JSON 格式回傳（不要包含任何 Markdown 格式框，僅回傳 JSON 內容）：
+{
+  "article": "採購法具體條文，例如：第22條、第22條第1項第9款。如無則為空字串",
+  "titleKeywords": "核心主題關鍵字（1-2個，以空白分隔），例如：限制性招標。如無則為空字串",
+  "contentKeywords": "全文內容關鍵字（1-2個，以空白分隔），例如：公告金額 最有利標。如無則為空字串",
+  "summary": "針對此問題的一句話簡短分析導讀與回答，說明應該參考哪些條文或函釋方向（不超過 100 字）"
+}
+
+使用者問題：「${question}」
+JSON 輸出：`;
+
+    const requestBody = {
+        contents: [
+            {
+                parts: [
+                    {
+                        text: prompt
+                    }
+                ]
+            }
+        ],
+        generationConfig: {
+            responseMimeType: "application/json"
+        }
+    };
+
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+    });
+
+    if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error?.message || `HTTP 錯誤 ${response.status}`);
+    }
+
+    const resData = await response.json();
+    const resultText = resData.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!resultText) {
+        throw new Error('AI 未回傳有效內容');
+    }
+
+    return JSON.parse(resultText.trim());
+}
+
+// 4. 處理 AI 智慧檢索
+async function handleAiSearch() {
+    if (!geminiApiKey) {
+        alert('使用 AI 解答博士前，請先點擊右上角齒輪設定您的 Gemini API 金鑰！');
+        openApiModal();
+        return;
+    }
+
+    const question = aiQuestionInput.value.trim();
+    if (!question) {
+        alert('請先輸入您想詢問的採購法問題！');
+        aiQuestionInput.focus();
+        return;
+    }
+
+    // 按鈕進入載入中狀態
+    btnAiSubmit.disabled = true;
+    const originalText = btnAiSubmit.innerHTML;
+    btnAiSubmit.innerHTML = `
+        <span class="pulse-indicator" style="background-color: #ffffff; box-shadow: 0 0 0 0 rgba(255,255,255,0.7); animation: pulse-white 1s infinite; margin-right: 0.5rem; vertical-align: middle;"></span>
+        AI 博士分析中...
+    `;
+
+    // 動態載入白色 pulse 的 style
+    if (!document.getElementById('pulse-white-style')) {
+        const style = document.createElement('style');
+        style.id = 'pulse-white-style';
+        style.innerHTML = `
+            @keyframes pulse-white {
+                0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7); }
+                70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(255, 255, 255, 0); }
+                100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    try {
+        const result = await callGeminiAPI(question);
+
+        // 1. 填入標準精準搜尋表單中
+        document.getElementById('search-article').value = result.article || '';
+        document.getElementById('search-title').value = result.titleKeywords || '';
+        document.getElementById('search-content').value = result.contentKeywords || '';
+        
+        // 清除發文字號與日期，防止條件過度縮小
+        document.getElementById('search-doc-num').value = '';
+        document.getElementById('search-date').value = '';
+
+        // 2. 切換回精準檢索頁籤，讓使用者看見自動帶入的條件
+        switchTab('standard');
+
+        // 3. 執行檢索
+        performSearch();
+
+        // 4. 渲染 AI 導讀重點提示卡片
+        renderAiGuideCard(question, result);
+    } catch (err) {
+        console.error('AI 智慧分析失敗：', err);
+        alert(`AI 智慧分析失敗：${err.message}\n請確認金鑰是否正確，或前往右上角設定更換金鑰。`);
+    } finally {
+        btnAiSubmit.disabled = false;
+        btnAiSubmit.innerHTML = originalText;
+    }
+}
+
+// 5. 渲染結果區上方的 AI 導讀提示卡片
+function renderAiGuideCard(question, result) {
+    const tagsHtml = [];
+    if (result.article) {
+        tagsHtml.push(`<span class="ai-tag ai-tag-article">建議法規：${escapeHtml(result.article)}</span>`);
+    }
+    if (result.titleKeywords) {
+        result.titleKeywords.split(/\s+/).forEach(kw => {
+            if (kw) tagsHtml.push(`<span class="ai-tag ai-tag-keyword">主題詞：${escapeHtml(kw)}</span>`);
+        });
+    }
+    if (result.contentKeywords) {
+        result.contentKeywords.split(/\s+/).forEach(kw => {
+            if (kw) tagsHtml.push(`<span class="ai-tag ai-tag-keyword">全文詞：${escapeHtml(kw)}</span>`);
+        });
+    }
+
+    aiGuideContainer.innerHTML = `
+        <div class="ai-guide-card">
+            <div class="ai-guide-header">
+                <div class="ai-guide-title">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
+                    AI 解答博士 重點導讀
+                </div>
+                <button class="ai-guide-close" aria-label="關閉" onclick="document.getElementById('ai-guide-container').innerHTML = ''">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+            <div style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.15rem; font-weight: 500;">
+                分析問題：${escapeHtml(question)}
+            </div>
+            <div class="ai-guide-content">
+                <strong>分析：</strong>${escapeHtml(result.summary || '已自動為您提取最相關的搜尋條件。')}
+            </div>
+            ${tagsHtml.length > 0 ? `<div class="ai-guide-tags">${tagsHtml.join('')}</div>` : ''}
+        </div>
+    `;
 }

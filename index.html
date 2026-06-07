@@ -41,6 +41,11 @@
                     <svg class="sun-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
                     <svg class="moon-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
                 </button>
+
+                <!-- API Key Config Button -->
+                <button id="api-key-config" class="icon-btn" aria-label="設定 AI 金鑰" title="設定 AI 金鑰">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                </button>
             </div>
         </div>
     </header>
@@ -48,69 +53,101 @@
     <main class="container main-content">
         <!-- Search Panel Section -->
         <section class="search-panel glass-panel">
-            <div class="panel-header">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-                <h2>設定搜尋條件</h2>
+            <div class="panel-tabs">
+                <button type="button" id="tab-standard" class="tab-btn active">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                    精準條件檢索
+                </button>
+                <button type="button" id="tab-ai" class="tab-btn">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
+                    AI 解答博士
+                </button>
             </div>
             
-            <form id="search-form" class="search-form">
-                <div class="form-grid">
-                    <!-- 發文字號 -->
-                    <div class="form-group">
-                        <label for="search-doc-num">發文字號</label>
-                        <div class="input-wrapper">
-                            <input type="text" id="search-doc-num" placeholder="例如：工程企字第1150004327號 或 1150004327">
+            <!-- Standard Search Form Container -->
+            <div id="standard-search-container" class="search-container">
+                <form id="search-form" class="search-form">
+                    <div class="form-grid">
+                        <!-- 發文字號 -->
+                        <div class="form-group">
+                            <label for="search-doc-num">發文字號</label>
+                            <div class="input-wrapper">
+                                <input type="text" id="search-doc-num" placeholder="例如：工程企字第1150004327號 或 1150004327">
+                            </div>
+                        </div>
+                        
+                        <!-- 依據採購法條文 -->
+                        <div class="form-group">
+                            <label for="search-article">依據採購法條文</label>
+                            <div class="input-wrapper">
+                                <input type="text" id="search-article" placeholder="例如：第22條、第63條、其他">
+                            </div>
+                        </div>
+                        
+                        <!-- 發文日期 -->
+                        <div class="form-group">
+                            <label for="search-date">發文日期 (民國年月日)</label>
+                            <div class="input-wrapper">
+                                <input type="text" id="search-date" placeholder="例如：1150528 (當日) 或 115 (年份)">
+                            </div>
+                        </div>
+                        
+                        <!-- 主題 -->
+                        <div class="form-group md-col-2">
+                            <label for="search-title">主題 (主旨)</label>
+                            <div class="input-wrapper">
+                                <input type="text" id="search-title" placeholder="請輸入主題關鍵字，支援模糊搜尋">
+                            </div>
+                        </div>
+                        
+                        <!-- 內容 -->
+                        <div class="form-group md-col-3">
+                            <label for="search-content">全文內容</label>
+                            <div class="input-wrapper">
+                                <input type="text" id="search-content" placeholder="請輸入函釋內文關鍵字（此搜尋為全文檢索）">
+                            </div>
                         </div>
                     </div>
-                    
-                    <!-- 依據採購法條文 -->
-                    <div class="form-group">
-                        <label for="search-article">依據採購法條文</label>
-                        <div class="input-wrapper">
-                            <input type="text" id="search-article" placeholder="例如：第22條、第63條、其他">
-                        </div>
-                    </div>
-                    
-                    <!-- 發文日期 -->
-                    <div class="form-group">
-                        <label for="search-date">發文日期 (民國年月日)</label>
-                        <div class="input-wrapper">
-                            <input type="text" id="search-date" placeholder="例如：1150528 (當日) 或 115 (年份)">
-                        </div>
-                    </div>
-                    
-                    <!-- 主題 -->
-                    <div class="form-group md-col-2">
-                        <label for="search-title">主題 (主旨)</label>
-                        <div class="input-wrapper">
-                            <input type="text" id="search-title" placeholder="請輸入主題關鍵字，支援模糊搜尋">
-                        </div>
-                    </div>
-                    
-                    <!-- 內容 -->
-                    <div class="form-group md-col-3">
-                        <label for="search-content">全文內容</label>
-                        <div class="input-wrapper">
-                            <input type="text" id="search-content" placeholder="請輸入函釋內文關鍵字（此搜尋為全文檢索）">
-                        </div>
-                    </div>
-                </div>
 
+                    <div class="form-actions">
+                        <button type="button" id="btn-reset" class="btn btn-secondary">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                            重設條件
+                        </button>
+                        <button type="submit" id="btn-submit" class="btn btn-primary">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                            開始查詢
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- AI Search Container (hidden by default) -->
+            <div id="ai-search-container" class="search-container d-none">
+                <div class="ai-input-group">
+                    <label for="ai-question">AI 解答博士（請輸入口語化採購問題，AI 會幫您分析條件）</label>
+                    <div class="textarea-wrapper">
+                        <textarea id="ai-question" rows="3" placeholder="例如：我想知道公告金額以上的限制性招標規定，特別是最有利標的評選細節..."></textarea>
+                    </div>
+                    <div class="ai-info-text">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                        本功能將利用 Gemini AI 模型解析您的提問，提取出相關的採購法條文、主題或內文關鍵字，並自動為您檢索相符的函釋。
+                    </div>
+                </div>
                 <div class="form-actions">
-                    <button type="button" id="btn-reset" class="btn btn-secondary">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-                        重設條件
-                    </button>
-                    <button type="submit" id="btn-submit" class="btn btn-primary">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-                        開始查詢
+                    <button type="button" id="btn-ai-submit" class="btn btn-primary btn-ai-sparkle">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
+                        AI 博士分析並檢索
                     </button>
                 </div>
-            </form>
+            </div>
         </section>
 
         <!-- Search Results Section -->
         <section class="results-section">
+            <!-- AI Answer Summary Card Container -->
+            <div id="ai-guide-container"></div>
+
             <div class="results-header">
                 <div class="results-stats">
                     <span id="results-count" class="badge">共 3650 筆資料</span>
@@ -152,6 +189,32 @@
             <p class="secondary-text">資料來源：行政院公共工程委員會主管法規解釋令。資料發布日期：民國 115 年 6 月 3 日。</p>
         </div>
     </footer>
+
+    <!-- API Key Config Modal -->
+    <div id="api-modal" class="modal-overlay">
+        <div class="modal-content glass-panel">
+            <div class="modal-header">
+                <h3>設定 Gemini API 金鑰</h3>
+                <button id="modal-close" class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>本功能使用 Google Gemini 進行語意分析與關鍵字提取，金鑰將直接發送至 Google 伺服器，安全且免費。</p>
+                <div class="form-group" style="margin-top: 1rem; margin-bottom: 0.5rem;">
+                    <label for="api-key-input">Gemini API 金鑰 (API Key)</label>
+                    <div class="input-wrapper">
+                        <input type="password" id="api-key-input" placeholder="請貼上您的 AIzaSy... 金鑰">
+                    </div>
+                </div>
+                <p class="help-text" style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.4;">
+                    金鑰僅儲存於您個人的瀏覽器中，絕不傳送到第三方。
+                    <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" style="color: var(--primary-hover); text-decoration: underline;">點此前往 Google AI Studio 免費申請金鑰</a>
+                </p>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1rem; border-top: 1px solid var(--border-color); padding-top: 0.75rem;">
+                <button id="btn-save-key" class="btn btn-primary">儲存設定</button>
+            </div>
+        </div>
+    </div>
 
     <!-- JS Logic -->
     <script src="app.js"></script>
