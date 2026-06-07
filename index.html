@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="zh-TW" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>政府採購法函釋檢索系統</title>
+    <meta name="description" content="政府採購法解釋令、函釋、法規與公文全文檢索系統。提供全欄位條件交叉查詢，支援背景資料分塊加載與離線檢索。">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- CSS Stylesheet -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Glassmorphic Header -->
+    <header class="main-header">
+        <div class="container header-container">
+            <div class="logo-area">
+                <span class="logo-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                </span>
+                <div class="logo-text">
+                    <h1>政府採購法函釋檢索</h1>
+                    <p>行政院公共工程委員會公文與解釋令全文檢索系統</p>
+                </div>
+            </div>
+            
+            <div class="header-actions">
+                <!-- Data Loading Progress Widget -->
+                <div id="loading-widget" class="loading-widget loading">
+                    <span class="pulse-indicator"></span>
+                    <span id="loading-status-text">資料載入中 (0/20)</span>
+                    <div class="progress-bar-container">
+                        <div id="progress-bar" class="progress-bar" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <!-- Theme Toggle Button -->
+                <button id="theme-toggle" class="icon-btn" aria-label="切換深淺色主題" title="切換深淺色主題">
+                    <svg class="sun-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+                    <svg class="moon-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="container main-content">
+        <!-- Search Panel Section -->
+        <section class="search-panel glass-panel">
+            <div class="panel-header">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                <h2>設定搜尋條件</h2>
+            </div>
+            
+            <form id="search-form" class="search-form">
+                <div class="form-grid">
+                    <!-- 發文字號 -->
+                    <div class="form-group">
+                        <label for="search-doc-num">發文字號</label>
+                        <div class="input-wrapper">
+                            <input type="text" id="search-doc-num" placeholder="例如：工程企字第1150004327號 或 1150004327">
+                        </div>
+                    </div>
+                    
+                    <!-- 依據採購法條文 -->
+                    <div class="form-group">
+                        <label for="search-article">依據採購法條文</label>
+                        <div class="input-wrapper">
+                            <input type="text" id="search-article" placeholder="例如：第22條、第63條、其他">
+                        </div>
+                    </div>
+                    
+                    <!-- 發文日期 -->
+                    <div class="form-group">
+                        <label for="search-date">發文日期 (民國年月日)</label>
+                        <div class="input-wrapper">
+                            <input type="text" id="search-date" placeholder="例如：1150528 (當日) 或 115 (年份)">
+                        </div>
+                    </div>
+                    
+                    <!-- 主題 -->
+                    <div class="form-group md-col-2">
+                        <label for="search-title">主題 (主旨)</label>
+                        <div class="input-wrapper">
+                            <input type="text" id="search-title" placeholder="請輸入主題關鍵字，支援模糊搜尋">
+                        </div>
+                    </div>
+                    
+                    <!-- 內容 -->
+                    <div class="form-group md-col-3">
+                        <label for="search-content">全文內容</label>
+                        <div class="input-wrapper">
+                            <input type="text" id="search-content" placeholder="請輸入函釋內文關鍵字（此搜尋為全文檢索）">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" id="btn-reset" class="btn btn-secondary">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                        重設條件
+                    </button>
+                    <button type="submit" id="btn-submit" class="btn btn-primary">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                        開始查詢
+                    </button>
+                </div>
+            </form>
+        </section>
+
+        <!-- Search Results Section -->
+        <section class="results-section">
+            <div class="results-header">
+                <div class="results-stats">
+                    <span id="results-count" class="badge">共 3650 筆資料</span>
+                    <span id="filter-status" class="filter-status-text">顯示全部</span>
+                </div>
+                
+                <div class="results-per-page">
+                    <label for="per-page-select">每頁顯示</label>
+                    <select id="per-page-select" class="custom-select">
+                        <option value="10">10 筆</option>
+                        <option value="20" selected>20 筆</option>
+                        <option value="50">50 筆</option>
+                        <option value="100">100 筆</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Main Results List (Cards/Accordion) -->
+            <div id="results-container" class="results-container">
+                <!-- Loaded dynamically by app.js -->
+                <div class="skeleton-loader">
+                    <div class="skeleton-card"></div>
+                    <div class="skeleton-card"></div>
+                    <div class="skeleton-card"></div>
+                </div>
+            </div>
+
+            <!-- Pagination Control -->
+            <div id="pagination-container" class="pagination-container">
+                <!-- Loaded dynamically by app.js -->
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="main-footer">
+        <div class="container footer-content">
+            <p>政府採購法函釋檢索系統 &copy; 2026. 建置於 GitHub Pages 靜態架構下。</p>
+            <p class="secondary-text">資料來源：行政院公共工程委員會主管法規解釋令。資料發布日期：民國 115 年 6 月 3 日。</p>
+        </div>
+    </footer>
+
+    <!-- JS Logic -->
+    <script src="app.js"></script>
+</body>
+</html>

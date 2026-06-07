@@ -1,0 +1,23 @@
+# System files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDEs and editors
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# Node / Python temp files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+
+# Raw JSON source file (uncomment if you want to keep the raw 7.3MB database out of git)
+# gplAll_1150603.json
