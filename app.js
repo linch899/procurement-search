@@ -522,91 +522,11 @@ function switchTab(tabType) {
         tabAi.classList.add('active');
         standardSearchContainer.classList.add('d-none');
         aiSearchContainer.classList.remove('d-none');
-        aiQuestionInput.focus();
     }
-}
-
-// 2. API Key 設定彈窗控制
-function openApiModal() {
-    apiKeyInput.value = geminiApiKey;
-    apiModal.classList.add('open');
-}
-
-function closeApiModal() {
-    apiModal.classList.remove('open');
-}
-
-function saveApiKey() {
-    const key = apiKeyInput.value.trim();
-    geminiApiKey = key;
-    localStorage.setItem('gemini_api_key', key);
-    closeApiModal();
-    alert('API 金鑰已儲存！');
-}
-
-// 3. 呼叫 Google Gemini API 進行語意分析
-async function callGeminiAPI(question) {
-    const model = 'gemini-2.0-flash';
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`;
-
-    const prompt = `你是一位專業的台灣政府採購法專家。請分析使用者提出的口語問題，提取出最相關的搜尋條件。
-    
-請嚴格以下列的 JSON 格式回傳（不要包含任何 Markdown 格式框，僅回傳 JSON 內容）：
-{
-  "article": "採購法具體條文，例如：第22條、第22條第1項第9款。如無則為空字串",
-  "titleKeywords": "核心主題關鍵字（1-2個，以空白分隔），例如：限制性招標。如無則為空字串",
-  "contentKeywords": "全文內容關鍵字（1-2個，以空白分隔），例如：公告金額 最有利標。如無則為空字串",
-  "summary": "針對此問題的一句話簡短分析導讀與回答，說明應該參考哪些條文或函釋方向（不超過 100 字）"
-}
-
-使用者問題：「${question}」
-JSON 輸出：`;
-
-    const requestBody = {
-        contents: [
-            {
-                parts: [
-                    {
-                        text: prompt
-                    }
-                ]
-            }
-        ],
-        generationConfig: {
-            responseMimeType: "application/json"
-        }
-    };
-
-    const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(requestBody)
-    });
-
-    if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.error?.message || `HTTP 錯誤 ${response.status}`);
-    }
-
-    const resData = await response.json();
-    const resultText = resData.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!resultText) {
-        throw new Error('AI 未回傳有效內容');
-    }
-
-    return JSON.parse(resultText.trim());
 }
 
 // 4. 處理 AI 智慧檢索
 async function handleAiSearch() {
-    if (!geminiApiKey) {
-        alert('使用 AI 解答博士前，請先點擊右上角齒輪設定您的 Gemini API 金鑰！');
-        openApiModal();
-        return;
-    }
-
     const question = aiQuestionInput.value.trim();
     if (!question) {
         alert('請先輸入您想詢問的採購法問題！');
@@ -614,7 +534,19 @@ async function handleAiSearch() {
         return;
     }
 
-    // 按鈕進入載入中狀態
+    // 免金鑰模式：執行本地智慧解析與自動檢索
+    if (!geminiApiKey) {
+        try {
+            const result = localSemanticParse(question);
+            applySearchAndRender(question, result);
+        } catch (err) {
+            console.error('本地智慧分析失敗：', err);
+            alert(`本地分析失敗：${err.message}`);
+        }
+        return;
+    }
+
+    // 有金鑰模式：按鈕進入載入中狀態並呼叫 Gemini 雲端 API
     btnAiSubmit.disabled = true;
     const originalText = btnAiSubmit.innerHTML;
     btnAiSubmit.innerHTML = `
@@ -638,24 +570,7 @@ async function handleAiSearch() {
 
     try {
         const result = await callGeminiAPI(question);
-
-        // 1. 填入標準精準搜尋表單中
-        document.getElementById('search-article').value = result.article || '';
-        document.getElementById('search-title').value = result.titleKeywords || '';
-        document.getElementById('search-content').value = result.contentKeywords || '';
-        
-        // 清除發文字號與日期，防止條件過度縮小
-        document.getElementById('search-doc-num').value = '';
-        document.getElementById('search-date').value = '';
-
-        // 2. 切換回精準檢索頁籤，讓使用者看見自動帶入的條件
-        switchTab('standard');
-
-        // 3. 執行檢索
-        performSearch();
-
-        // 4. 渲染 AI 導讀重點提示卡片
-        renderAiGuideCard(question, result);
+        applySearchAndRender(question, result);
     } catch (err) {
         console.error('AI 智慧分析失敗：', err);
         const errorMsg = err.message || '';
@@ -670,7 +585,28 @@ async function handleAiSearch() {
     }
 }
 
-// 5. 渲染結果區上方的 AI 導讀提示卡片
+// 5. 填入搜尋條件並觸發檢索渲染
+function applySearchAndRender(question, result) {
+    // 填入標準精準搜尋表單中
+    document.getElementById('search-article').value = result.article || '';
+    document.getElementById('search-title').value = result.titleKeywords || '';
+    document.getElementById('search-content').value = result.contentKeywords || '';
+    
+    // 清除發文字號與日期，防止條件過度縮小
+    document.getElementById('search-doc-num').value = '';
+    document.getElementById('search-date').value = '';
+
+    // 切換回精準檢索頁籤，讓使用者看見自動帶入的條件
+    switchTab('standard');
+
+    // 執行檢索
+    performSearch();
+
+    // 渲染 AI 博士的重點提示卡片
+    renderAiGuideCard(question, result);
+}
+
+// 6. 渲染結果區上方的 AI 導讀/重點提示卡片
 function renderAiGuideCard(question, result) {
     const tagsHtml = [];
     if (result.article) {
@@ -695,7 +631,7 @@ function renderAiGuideCard(question, result) {
                     AI 博士的重點提示
                 </div>
                 <button class="ai-guide-close" aria-label="關閉" onclick="document.getElementById('ai-guide-container').innerHTML = ''">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                 </button>
             </div>
             <div style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.15rem; font-weight: 500;">
@@ -707,4 +643,167 @@ function renderAiGuideCard(question, result) {
             ${tagsHtml.length > 0 ? `<div class="ai-guide-tags">${tagsHtml.join('')}</div>` : ''}
         </div>
     `;
+}
+
+// === 採購法中文數字與法規格式標準化 ===
+function normalizeProcurementArticles(text) {
+    if (!text) return '';
+    const numMap = {
+        '零': 0, '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9, '十': 10,
+        '壹': 1, '貳': 2, '參': 3, '肆': 4, '伍': 5, '陸': 6, '柒': 7, '捌': 8, '玖': 9, '拾': 10,
+        '廿': 20, '卅': 30
+    };
+    
+    function parseChineseNum(chs) {
+        if (!chs) return 0;
+        if (/^\d+$/.test(chs)) return parseInt(chs, 10);
+        let total = 0;
+        let temp = 0;
+        for (let i = 0; i < chs.length; i++) {
+            const char = chs[i];
+            if (numMap[char] !== undefined) {
+                const val = numMap[char];
+                if (char === '十' || char === '拾') {
+                    if (temp === 0) temp = 1;
+                    total += temp * 10;
+                    temp = 0;
+                } else if (char === '廿') {
+                    total += 20;
+                    temp = 0;
+                } else if (char === '卅') {
+                    total += 30;
+                    temp = 0;
+                } else {
+                    temp = val;
+                }
+            }
+        }
+        total += temp;
+        return total;
+    }
+    
+    // 優先把中文或阿拉伯數字的 "第X條/第X項/第X款" 甚至 "X條/X項/X款" 統整轉為標準 "第X條" / "第X項" / "第X款"
+    return text.replace(/(第)?\s*([零一二三四五六七八九十廿卅\d]+)\s*([條項款])/g, (match, prefix, numStr, unit) => {
+        const arabic = parseChineseNum(numStr);
+        return `第${arabic}${unit}`;
+    });
+}
+
+// 7. 本地智慧關鍵字與法規解析器 (免 API Key 模式)
+function localSemanticParse(question) {
+    const result = {
+        article: '',
+        titleKeywords: '',
+        contentKeywords: '',
+        summary: ''
+    };
+
+    // 1. 標準化中文數字與條文格式
+    const normalizedQuestion = normalizeProcurementArticles(question);
+
+    // 2. 提取法規條文 (正則匹配 "第XX條第X項第X款" 或 "第XX條第X款" 或 "第XX條")
+    const articleRegex = /(第\d+條(?:第\d+項)?(?:第\d+款)?|第\d+條第\d+款)/g;
+    const matchedArticles = normalizedQuestion.match(articleRegex);
+    if (matchedArticles && matchedArticles.length > 0) {
+        result.article = matchedArticles[0].replace(/\s+/g, '');
+    }
+
+    // 3. 基於採購法常用詞庫對照表提取關鍵字
+    const keywordsDict = {
+        // 主題關鍵字 (對位至「主題關鍵字」欄位)
+        '限制性招標': ['限制性招標', '限制性', '協商改採限制性招標', '招標方式變更'],
+        '公開招標': ['公開招標', '公開'],
+        '選擇性招標': ['選擇性招標', '選擇性'],
+        '公開取得': ['公開取得', '公開取得企劃書', '公開取得報價單'],
+        '最有利標': ['最有利標', '最有利', '準用最有利標', '適用最有利標'],
+        '最低標': ['最低標', '最低'],
+        '共同供應契約': ['共同供應契約', '共同供應', '共約'],
+        '停權': ['停權', '不良廠商', '第101條停權', '刊登公報', '政府採購公報'],
+        '申訴': ['申訴', '採購申訴', '異議', '爭議處理', '調解', '爭議調解'],
+        
+        // 全文關鍵字 (對位至「全文關鍵字」欄位)
+        '評選': ['評選', '評估項目', '評審', '評選委員會', '評分', '評審小組', '評分表', '評審委員', '評估指標'],
+        '企劃書': ['企劃書', '徵求企劃書', '企劃案', '服務建議書', '建議書'],
+        '公告金額': ['公告金額', '公告金額以上'],
+        '未達公告金額': ['未達公告金額', '未達公告'],
+        '小額採購': ['小額採購', '小額', '十萬元以下', '10萬元以下'],
+        '巨額': ['巨額採購', '巨額', '巨額金額'],
+        '查核金額': ['查核金額'],
+        '契約變更': ['契約變更', '變更契約', '變更設計', '契約修改', '追加預算', '減價收受'],
+        '驗收': ['驗收', '部分驗收', '驗收不符', '驗收程序', '主驗人', '會驗人'],
+        '逾期違約金': ['逾期違約金', '逾期', '違約金', '罰款', '扣款', '遲延履約'],
+        '保固': ['保固', '保固金', '保固期', '保固責任']
+    };
+
+    const foundTitleKws = [];
+    const foundContentKws = [];
+
+    // 逐一匹配詞庫
+    for (const [key, aliases] of Object.entries(keywordsDict)) {
+        for (const alias of aliases) {
+            if (normalizedQuestion.includes(alias)) {
+                if (['限制性招標', '公開招標', '選擇性招標', '最有利標', '最低標', '共同供應契約', '停權', '申訴'].includes(key)) {
+                    if (!foundTitleKws.includes(key)) foundTitleKws.push(key);
+                } else {
+                    if (!foundContentKws.includes(key)) foundContentKws.push(key);
+                }
+                break;
+            }
+        }
+    }
+
+    result.titleKeywords = foundTitleKws.join(' ');
+    result.contentKeywords = foundContentKws.join(' ');
+
+    // 4. 口語贅詞過濾，無匹配關鍵字時的兜底邏輯
+    const stopWords = ['請問', '我想', 'know', '知道', '關於', '如何', '什麼', '規定', '需要', '怎麼', '辦理', '適用', '情形', '問題', '有沒有', '法規', '是否', '合適', '合理', '可以', '不可', '不得', '怎麼做', '程序', '方式', '什麼是', '為何', '分析', '解答'];
+    
+    // 如果字典完全沒有匹配到，就用斷詞提詞作為兜底
+    if (!result.titleKeywords && !result.contentKeywords) {
+        // 移除條文關鍵字，避免將條文重複做為全文關鍵字
+        let cleanedQ = normalizedQuestion;
+        if (result.article) {
+            cleanedQ = cleanedQ.replace(result.article, '');
+        }
+        
+        const words = cleanedQ.split(/[\s，。？、！\?]+/).filter(w => {
+            return w.length >= 2 && !stopWords.includes(w) && !/第\d+[條項款]/.test(w);
+        });
+        
+        if (words.length > 0) {
+            result.contentKeywords = words.slice(0, 2).join(' ');
+        }
+    }
+
+    // 5. 根據提取到的法規條文或關鍵字，渲染重點提示文字
+    let summaryText = '已透過本地智慧分析提取出最相關的搜尋條件。';
+    if (result.article) {
+        summaryText += ` 針對「${result.article}」，系統已自動為您定位。`;
+        const artNum = result.article.match(/\d+/);
+        if (artNum) {
+            const num = parseInt(artNum[0], 10);
+            if (num === 22) {
+                summaryText += ' 政府採購法第 22 條為限制性招標的適用情形（共計 16 款），最常搭配最有利標或評選辦理。';
+            } else if (num === 101) {
+                summaryText += ' 政府採購法第 101 條為關於將不良廠商停權之刊登公報處分，常伴隨異議申訴救濟程序。';
+            } else if (num === 63) {
+                summaryText += ' 政府採購法第 63 條主要為採購契約要項及範本規範之法規依據。';
+            } else if (num === 19) {
+                summaryText += ' 政府採購法第 19 條規定公告金額以上之採購，除另有規定外應公開招標辦理。';
+            } else if (num === 48) {
+                summaryText += ' 政府採購法第 48 條為招標開標投標廠商家數不足或流標之處理規定。';
+            } else if (num === 94) {
+                summaryText += ' 政府採購法第 94 條為評選委員會組成與遴選辦法之法源基礎。';
+            } else if (num === 102) {
+                summaryText += ' 政府採購法第 102 條為廠商對停權通知異議與申訴之期限與程序規定。';
+            }
+        }
+    } else if (result.titleKeywords || result.contentKeywords) {
+        summaryText += ` 已為您自動匹配核心關鍵字：${[result.titleKeywords, result.contentKeywords].filter(Boolean).join('、')}。`;
+    } else {
+        summaryText += ' 未匹配到特定條文或核心關鍵字。請嘗試輸入更具體的採購問題。';
+    }
+
+    result.summary = summaryText + '（提示：您可點擊右上角齒輪設定 Gemini API 金鑰以解鎖更強大的大模型語意分析功能）';
+    return result;
 }
