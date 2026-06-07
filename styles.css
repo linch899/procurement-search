@@ -853,3 +853,124 @@ html[data-theme="light"] .skeleton-card {
     font-size: 0.75rem;
     color: var(--text-muted);
 }
+
+/* ==========================================
+   Responsive Media Queries (Mobile & Tablet)
+   ========================================== */
+
+/* Tablet & Mobile Grid Adjustments (max-width: 992px) */
+@media (max-width: 992px) {
+    .container {
+        padding: 0 1rem;
+    }
+    
+    .main-content {
+        margin-top: 1.25rem;
+        gap: 1.25rem;
+    }
+}
+
+/* Mobile & Small Tablet Header / Grid Adjustments (max-width: 768px) */
+@media (max-width: 768px) {
+    .header-container {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 1rem;
+        padding-top: 0.5rem;
+        padding-bottom: 0.5rem;
+    }
+
+    .logo-area {
+        justify-content: center;
+    }
+
+    .header-actions {
+        justify-content: space-between;
+        width: 100%;
+        gap: 0.75rem;
+    }
+
+    .loading-widget {
+        flex-grow: 1;
+        min-width: 0;
+        align-items: flex-start;
+    }
+
+    /* Stack form buttons on mobile */
+    .form-actions {
+        flex-direction: column-reverse;
+        width: 100%;
+    }
+
+    .form-actions .btn {
+        width: 100%;
+        padding: 0.85rem;
+    }
+
+    /* Adjust results header wrapping */
+    .results-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.75rem;
+    }
+
+    .results-per-page {
+        justify-content: space-between;
+    }
+
+    /* Adjust card spacing and paddings */
+    .card-header {
+        padding: 1rem;
+    }
+
+    .card-body-content {
+        padding: 1rem;
+        gap: 1rem;
+    }
+
+    .content-text {
+        font-size: 0.9rem;
+    }
+
+    .card-title {
+        font-size: 0.95rem;
+    }
+
+    /* Pagination button wrapping and layout */
+    .pagination-container {
+        gap: 0.3rem;
+    }
+
+    .pagination-btn {
+        min-width: 2rem;
+        height: 2rem;
+        font-size: 0.8rem;
+    }
+}
+
+/* Extra Small Screens (max-width: 480px) */
+@media (max-width: 480px) {
+    .logo-text h1 {
+        font-size: 1.1rem;
+    }
+    
+    .logo-icon {
+        width: 2.25rem;
+        height: 2.25rem;
+        border-radius: 0.5rem;
+    }
+    
+    .logo-icon svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    .card-meta-row {
+        gap: 0.5rem;
+    }
+
+    .meta-item {
+        padding: 0.15rem 0.4rem;
+        font-size: 0.7rem;
+    }
+}
