@@ -202,7 +202,7 @@ function executeFilter() {
             return false;
         }
         // 發文日期篩選 (可比對民國年或完整年月日)
-        if (date && (!item.發文日期 || !item.發文日期.includes(date))) {
+        if (date && (!item.發文日期 || !item.發文日期.startsWith(date))) {
             return false;
         }
         // 主題篩選
