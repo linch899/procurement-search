@@ -525,6 +525,81 @@ function switchTab(tabType) {
     }
 }
 
+// 2. API Key 設定彈窗控制
+function openApiModal() {
+    apiKeyInput.value = geminiApiKey;
+    apiModal.classList.add('open');
+}
+
+function closeApiModal() {
+    apiModal.classList.remove('open');
+}
+
+function saveApiKey() {
+    const key = apiKeyInput.value.trim();
+    geminiApiKey = key;
+    localStorage.setItem('gemini_api_key', key);
+    closeApiModal();
+    alert('API 金鑰已儲存！');
+}
+
+// 3. 呼叫 Google Gemini API 進行語意分析
+async function callGeminiAPI(question) {
+    const model = 'gemini-2.0-flash';
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`;
+
+    const prompt = `你是一位專業的台灣政府採購法專家。請分析使用者提出的口語問題，提取出最相關的搜尋條件。
+    
+請嚴格以下列的 JSON 格式回傳（不要包含任何 Markdown 格式框，僅回傳 JSON 內容）：
+{
+  "article": "採購法具體條文，例如：第22條、第22條第1項第9款。如無則為空字串",
+  "titleKeywords": "核心主題關鍵字（1-2個，以空白分隔），例如：限制性招標。如無則為空字串",
+  "contentKeywords": "全文內容關鍵字（1-2個，以空白分隔），例如：公告金額 最有利標。如無則為空字串",
+  "summary": "針對此問題的一句話簡短分析導讀與回答，說明應該參考哪些條文或函釋方向（不超過 100 字）"
+}
+
+使用者問題：「${question}」
+JSON 輸出：`;
+
+    const requestBody = {
+        contents: [
+            {
+                parts: [
+                    {
+                        text: prompt
+                    }
+                ]
+            }
+        ],
+        generationConfig: {
+            responseMimeType: "application/json"
+        }
+    };
+
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+    });
+
+    if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error?.message || `HTTP 錯誤 ${response.status}`);
+    }
+
+    const resData = await response.json();
+    const resultText = resData.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!resultText) {
+        throw new Error('AI 未回傳有效內容');
+    }
+
+    const parsed = JSON.parse(resultText.trim());
+    parsed.isLocal = false; // Mark as Gemini API mode
+    return parsed;
+}
+
 // 4. 處理 AI 智慧檢索
 async function handleAiSearch() {
     const question = aiQuestionInput.value.trim();
@@ -623,12 +698,17 @@ function renderAiGuideCard(question, result) {
         });
     }
 
+    const modeBadge = result.isLocal 
+        ? `<span class="ai-mode-badge" style="font-size: 0.75rem; background-color: var(--border-color); color: var(--text-secondary); padding: 0.15rem 0.5rem; border-radius: 4px; margin-left: 0.5rem; font-weight: 500; border: 1px solid var(--border-color);">本地解析</span>`
+        : `<span class="ai-mode-badge" style="font-size: 0.75rem; background-color: rgba(99, 102, 241, 0.15); color: #818cf8; padding: 0.15rem 0.5rem; border-radius: 4px; margin-left: 0.5rem; font-weight: 500; border: 1px solid rgba(99, 102, 241, 0.3);">Gemini 語意分析</span>`;
+
     aiGuideContainer.innerHTML = `
         <div class="ai-guide-card">
             <div class="ai-guide-header">
                 <div class="ai-guide-title">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
                     AI 博士的重點提示
+                    ${modeBadge}
                 </div>
                 <button class="ai-guide-close" aria-label="關閉" onclick="document.getElementById('ai-guide-container').innerHTML = ''">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -695,7 +775,8 @@ function localSemanticParse(question) {
         article: '',
         titleKeywords: '',
         contentKeywords: '',
-        summary: ''
+        summary: '',
+        isLocal: true // Mark as local mode
     };
 
     // 1. 標準化中文數字與條文格式
@@ -735,25 +816,23 @@ function localSemanticParse(question) {
         '保固': ['保固', '保固金', '保固期', '保固責任']
     };
 
-    const foundTitleKws = [];
-    const foundContentKws = [];
+    const matchedKws = [];
 
     // 逐一匹配詞庫
     for (const [key, aliases] of Object.entries(keywordsDict)) {
         for (const alias of aliases) {
             if (normalizedQuestion.includes(alias)) {
-                if (['限制性招標', '公開招標', '選擇性招標', '最有利標', '最低標', '共同供應契約', '停權', '申訴'].includes(key)) {
-                    if (!foundTitleKws.includes(key)) foundTitleKws.push(key);
-                } else {
-                    if (!foundContentKws.includes(key)) foundContentKws.push(key);
+                if (!matchedKws.includes(key)) {
+                    matchedKws.push(key);
                 }
                 break;
             }
         }
     }
 
-    result.titleKeywords = foundTitleKws.join(' ');
-    result.contentKeywords = foundContentKws.join(' ');
+    // 詞彙欄位歸類同時在「主題關鍵字」及「全文內文關鍵字」
+    result.titleKeywords = matchedKws.join(' ');
+    result.contentKeywords = matchedKws.join(' ');
 
     // 4. 口語贅詞過濾，無匹配關鍵字時的兜底邏輯
     const stopWords = ['請問', '我想', 'know', '知道', '關於', '如何', '什麼', '規定', '需要', '怎麼', '辦理', '適用', '情形', '問題', '有沒有', '法規', '是否', '合適', '合理', '可以', '不可', '不得', '怎麼做', '程序', '方式', '什麼是', '為何', '分析', '解答'];
@@ -771,7 +850,9 @@ function localSemanticParse(question) {
         });
         
         if (words.length > 0) {
-            result.contentKeywords = words.slice(0, 2).join(' ');
+            const fallbackKeywords = words.slice(0, 2).join(' ');
+            result.titleKeywords = fallbackKeywords;
+            result.contentKeywords = fallbackKeywords;
         }
     }
 
