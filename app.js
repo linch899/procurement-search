@@ -241,13 +241,19 @@ function executeFilter() {
         if (date && (!item.發文日期 || !item.發文日期.startsWith(date))) {
             return false;
         }
-        // 主題篩選
-        if (title && (!item.主題 || !item.主題.toLowerCase().includes(title.toLowerCase()))) {
-            return false;
+        // 主題篩選 (支援多關鍵字空格交集模糊檢索)
+        if (title) {
+            if (!item.主題) return false;
+            const keywords = title.toLowerCase().split(/\s+/).filter(Boolean);
+            const matches = keywords.every(kw => item.主題.toLowerCase().includes(kw));
+            if (!matches) return false;
         }
-        // 內容全文篩選
-        if (content && (!item.內容 || !item.內容.toLowerCase().includes(content.toLowerCase()))) {
-            return false;
+        // 內容全文篩選 (支援多關鍵字空格交集模糊檢索)
+        if (content) {
+            if (!item.內容) return false;
+            const keywords = content.toLowerCase().split(/\s+/).filter(Boolean);
+            const matches = keywords.every(kw => item.內容.toLowerCase().includes(kw));
+            if (!matches) return false;
         }
         return true;
     });
@@ -484,12 +490,21 @@ function escapeHtml(str) {
         .replace(/'/g, '&#039;');
 }
 
-// 將搜尋關鍵字高亮包覆
+// 將搜尋關鍵字高亮包覆 (支援多關鍵字獨立高亮，避免 HTML 標籤損壞)
 function highlightKeyword(text, keyword) {
     if (!keyword) return text;
-    const escapedKeyword = keyword.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-    const regex = new RegExp(`(${escapedKeyword})`, 'gi');
-    return text.replace(regex, '<span class="search-highlight">$1</span>');
+    let highlightedText = text;
+    // 將多關鍵字以空白切分，並由長到短排序（避免短字先高亮破壞 HTML 結構）
+    const keywords = keyword.split(/\s+/).filter(Boolean).sort((a, b) => b.length - a.length);
+    
+    keywords.forEach(kw => {
+        if (kw.length === 0) return;
+        const escapedKeyword = kw.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+        // 僅匹配非 HTML 標籤內部的純文字，避免重複替換已有標籤之屬性
+        const regex = new RegExp(`(${escapedKeyword})(?![^<>]*>)`, 'gi');
+        highlightedText = highlightedText.replace(regex, '<span class="search-highlight">$1</span>');
+    });
+    return highlightedText;
 }
 
 // 格式化內文並處理高亮
@@ -830,15 +845,15 @@ function localSemanticParse(question) {
         }
     }
 
-    // 詞彙欄位歸類同時在「主題關鍵字」及「全文內文關鍵字」
-    result.titleKeywords = matchedKws.join(' ');
+    // 詞彙欄位歸類僅在「全文內文關鍵字」
+    result.titleKeywords = '';
     result.contentKeywords = matchedKws.join(' ');
 
     // 4. 口語贅詞過濾，無匹配關鍵字時的兜底邏輯
-    const stopWords = ['請問', '我想', 'know', '知道', '關於', '如何', '什麼', '規定', '需要', '怎麼', '辦理', '適用', '情形', '問題', '有沒有', '法規', '是否', '合適', '合理', '可以', '不可', '不得', '怎麼做', '程序', '方式', '什麼是', '為何', '分析', '解答'];
+    const stopWords = ['請問', '我想', 'know', '知道', '關於', '如何', '什麼', '規定', '需要', '怎麼', '辦理', '適用', '情形', '問題', '有沒有', '法規', '是否', '合適', '合理', '可以', '不可', '不得', '怎麼做', '程序', '方式', '什麼是', '為系', '為何', '分析', '解答'];
     
     // 如果字典完全沒有匹配到，就用斷詞提詞作為兜底
-    if (!result.titleKeywords && !result.contentKeywords) {
+    if (!result.contentKeywords) {
         // 移除條文關鍵字，避免將條文重複做為全文關鍵字
         let cleanedQ = normalizedQuestion;
         if (result.article) {
@@ -851,7 +866,7 @@ function localSemanticParse(question) {
         
         if (words.length > 0) {
             const fallbackKeywords = words.slice(0, 2).join(' ');
-            result.titleKeywords = fallbackKeywords;
+            result.titleKeywords = '';
             result.contentKeywords = fallbackKeywords;
         }
     }
@@ -879,8 +894,8 @@ function localSemanticParse(question) {
                 summaryText += ' 政府採購法第 102 條為廠商對停權通知異議與申訴之期限與程序規定。';
             }
         }
-    } else if (result.titleKeywords || result.contentKeywords) {
-        summaryText += ` 已為您自動匹配核心關鍵字：${[result.titleKeywords, result.contentKeywords].filter(Boolean).join('、')}。`;
+    } else if (result.contentKeywords) {
+        summaryText += ` 已為您自動匹配核心關鍵字：${result.contentKeywords.split(/\s+/).join('、')}。`;
     } else {
         summaryText += ' 未匹配到特定條文或核心關鍵字。請嘗試輸入更具體的採購問題。';
     }
