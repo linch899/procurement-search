@@ -546,8 +546,8 @@ function saveApiKey() {
 
 // 3. 呼叫 Google Gemini API 進行語意分析
 async function callGeminiAPI(question) {
-    const model = 'gemini-1.5-flash';
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`;
+    const model = 'gemini-2.0-flash';
+    const url = `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${geminiApiKey}`;
 
     const prompt = `你是一位專業的台灣政府採購法專家。請分析使用者提出的口語問題，提取出最相關的搜尋條件。
     
