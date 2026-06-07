@@ -658,7 +658,12 @@ async function handleAiSearch() {
         renderAiGuideCard(question, result);
     } catch (err) {
         console.error('AI 智慧分析失敗：', err);
-        alert(`AI 智慧分析失敗：${err.message}\n請確認金鑰是否正確，或前往右上角設定更換金鑰。`);
+        const errorMsg = err.message || '';
+        if (errorMsg.toLowerCase().includes('quota') || errorMsg.toLowerCase().includes('limit') || errorMsg.includes('429')) {
+            alert(`AI 智慧分析失敗：您的 Gemini API 金鑰已達免費額度限制或呼叫頻率過高 (Rate Limit/Quota Exceeded)。\n\n【建議解法】請等待約 30 秒後再次嘗試，或點擊右上角齒輪更換另一組免費 API 金鑰。`);
+        } else {
+            alert(`AI 智慧分析失敗：${errorMsg}\n請確認金鑰是否正確，或前往右上角設定更換金鑰。`);
+        }
     } finally {
         btnAiSubmit.disabled = false;
         btnAiSubmit.innerHTML = originalText;
