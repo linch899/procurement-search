@@ -235,14 +235,33 @@ function switchDatabase(dbType) {
     if (currentDatabase === dbType) return;
     
     currentDatabase = dbType;
+    
+    // 獲取欄位元素及其父層 form-group
+    const docNumInput = document.getElementById('search-doc-num');
+    const dateInput = document.getElementById('search-date');
+    const docNumGroup = docNumInput ? docNumInput.closest('.form-group') : null;
+    const dateGroup = dateInput ? dateInput.closest('.form-group') : null;
+    
     if (dbType === 'rulings') {
         dbBtnRulings.classList.add('active');
         dbBtnErrors.classList.remove('active');
         allData = allRulingsData;
+        
+        // 顯示發文字號與發文日期欄位
+        if (docNumGroup) docNumGroup.classList.remove('d-none');
+        if (dateGroup) dateGroup.classList.remove('d-none');
     } else {
         dbBtnRulings.classList.remove('active');
         dbBtnErrors.classList.add('active');
         allData = allErrorsData;
+        
+        // 隱藏發文字號與發文日期欄位，並清空輸入值以防干擾篩選
+        if (docNumGroup) docNumGroup.classList.add('d-none');
+        if (dateGroup) dateGroup.classList.add('d-none');
+        if (docNumInput) docNumInput.value = '';
+        if (dateInput) dateInput.value = '';
+        searchCriteria.docNum = '';
+        searchCriteria.date = '';
     }
     
     // 更新進度條文字與就緒狀態
