@@ -6,14 +6,21 @@
  */
 
 // === 全域狀態管理 ===
-let allData = [];            // 背景載入的所有原始資料
+let allData = [];            // 目前搜尋作用中的原始資料
+let allRulingsData = [];     // 背景載入的所有函釋資料
+let allErrorsData = [];      // 背景載入的所有錯誤態樣資料
 let filteredData = [];       // 符合目前篩選條件的資料
 let currentPage = 1;         // 目前分頁頁碼 (1-based)
 let itemsPerPage = 20;       // 每頁顯示筆數
+let currentDatabase = 'rulings'; // 當前資料庫：'rulings' 或 'errors'
 
-let totalChunks = 0;         // 資料區塊總數
-let loadedChunks = 0;        // 已載入區塊數
+let totalChunks = 0;         // 函釋資料區塊總數
+let loadedChunks = 0;        // 已載入函釋區塊數
 let manifest = null;         // 存放 manifest 資訊
+
+let errorTotalChunks = 0;    // 錯誤態樣區塊總數
+let errorLoadedChunks = 0;   // 已載入錯誤態樣區塊數
+let errorManifest = null;    // 存放錯誤態樣 manifest 資訊
 
 let geminiApiKey = localStorage.getItem('gemini_api_key') || '';
 
@@ -55,10 +62,15 @@ const modalClose = document.getElementById('modal-close');
 const apiKeyInput = document.getElementById('api-key-input');
 const btnSaveKey = document.getElementById('btn-save-key');
 
+// Database Toggle Buttons
+const dbBtnRulings = document.getElementById('db-btn-rulings');
+const dbBtnErrors = document.getElementById('db-btn-errors');
+
 // === 初始化設定 ===
 document.addEventListener('DOMContentLoaded', () => {
     initTheme();
     loadManifest();
+    loadErrorManifest();
     setupEventListeners();
 });
 
@@ -124,6 +136,12 @@ function setupEventListeners() {
 
     // AI 解答博士提交
     btnAiSubmit.addEventListener('click', handleAiSearch);
+
+    // 資料庫切換鈕監聽
+    if (dbBtnRulings && dbBtnErrors) {
+        dbBtnRulings.addEventListener('click', () => switchDatabase('rulings'));
+        dbBtnErrors.addEventListener('click', () => switchDatabase('errors'));
+    }
 }
 
 // === 資料載入機制 ===
@@ -151,15 +169,17 @@ async function loadChunksSequentially(chunks) {
             if (!response.ok) throw new Error(`無法載入區塊: ${chunk.filename}`);
             
             const chunkData = await response.json();
-            allData = allData.concat(chunkData);
+            allRulingsData = allRulingsData.concat(chunkData);
             loadedChunks++;
+            
+            if (currentDatabase === 'rulings') {
+                allData = allRulingsData;
+                // 當前載入新區塊時，動態更新搜尋結果
+                refreshSearchResultsSilently();
+            }
             
             // 更新進度條 UI
             updateLoadingProgress();
-            
-            // 當前載入新區塊時，若處於「顯示全部」或有「搜尋中」，動態更新資料
-            // 由於是非同步背景載入，這樣使用者可以邊載入邊看到搜尋結果增加
-            refreshSearchResultsSilently();
             
             // 稍微延遲以避免瀏覽器執行緒阻塞，使 UI 更流暢
             await new Promise(resolve => setTimeout(resolve, 30));
@@ -169,6 +189,69 @@ async function loadChunksSequentially(chunks) {
     }
 }
 
+// 載入錯誤態樣索引與分塊
+async function loadErrorManifest() {
+    try {
+        const response = await fetch('data/error_manifest.json');
+        if (!response.ok) throw new Error('無法載入 error_manifest.json');
+        
+        errorManifest = await response.json();
+        errorTotalChunks = errorManifest.total_chunks;
+        
+        // 開始背景非同步載入錯誤區塊
+        loadErrorChunksSequentially(errorManifest.chunks);
+    } catch (err) {
+        console.error('載入錯誤態樣索引失敗：', err);
+    }
+}
+
+async function loadErrorChunksSequentially(chunks) {
+    for (const chunk of chunks) {
+        try {
+            const response = await fetch(chunk.filename);
+            if (!response.ok) throw new Error(`無法載入錯誤區塊: ${chunk.filename}`);
+            
+            const chunkData = await response.json();
+            allErrorsData = allErrorsData.concat(chunkData);
+            errorLoadedChunks++;
+            
+            if (currentDatabase === 'errors') {
+                allData = allErrorsData;
+                refreshSearchResultsSilently();
+            }
+            
+            // 更新進度條 UI
+            updateLoadingProgress();
+            
+            await new Promise(resolve => setTimeout(resolve, 30));
+        } catch (err) {
+            console.error(`載入錯誤區塊 ${chunk.id} 失敗:`, err);
+        }
+    }
+}
+
+// 切換作用中的資料庫
+function switchDatabase(dbType) {
+    if (currentDatabase === dbType) return;
+    
+    currentDatabase = dbType;
+    if (dbType === 'rulings') {
+        dbBtnRulings.classList.add('active');
+        dbBtnErrors.classList.remove('active');
+        allData = allRulingsData;
+    } else {
+        dbBtnRulings.classList.remove('active');
+        dbBtnErrors.classList.add('active');
+        allData = allErrorsData;
+    }
+    
+    // 更新進度條文字與就緒狀態
+    updateLoadingProgress();
+    
+    // 執行搜尋
+    performSearch();
+}
+
 function updateLoadingProgress() {
     const percentage = Math.round((loadedChunks / totalChunks) * 100);
     progressBar.style.width = `${percentage}%`;
@@ -176,9 +259,11 @@ function updateLoadingProgress() {
     if (loadedChunks === totalChunks) {
         loadingWidget.classList.remove('loading');
         loadingWidget.classList.add('complete');
+        const count = currentDatabase === 'rulings' ? allRulingsData.length : allErrorsData.length;
+        const dbName = currentDatabase === 'rulings' ? '函釋' : '錯誤態樣';
         loadingStatusText.innerHTML = `
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:2px;"><polyline points="20 6 9 17 4 12"/></svg>
-            資料已就緒 (共 ${allData.length} 筆)
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:2px; vertical-align: middle;"><polyline points="20 6 9 17 4 12"/></svg>
+            ${dbName}已就緒 (共 ${count} 筆)
         `;
     } else {
         loadingStatusText.textContent = `載入背景資料區 (${loadedChunks}/${totalChunks})`;
@@ -233,9 +318,14 @@ function executeFilter() {
         if (docNum && (!item.發文字號 || !item.發文字號.toLowerCase().includes(docNum.toLowerCase()))) {
             return false;
         }
-        // 依據採購法條文篩選
-        if (article && (!item.依據採購法條文 || !item.依據採購法條文.toLowerCase().includes(article.toLowerCase()))) {
-            return false;
+        // 依據採購法條文篩選 (忽略空白以提供最彈性的匹配)
+        if (article) {
+            if (!item.依據採購法條文) return false;
+            const cleanArticle = article.replace(/\s+/g, '').toLowerCase();
+            const cleanItemArticle = item.依據採購法條文.replace(/\s+/g, '').toLowerCase();
+            if (!cleanItemArticle.includes(cleanArticle)) {
+                return false;
+            }
         }
         // 發文日期篩選 (可比對民國年或完整年月日)
         if (date && (!item.發文日期 || !item.發文日期.startsWith(date))) {
@@ -319,6 +409,14 @@ function renderResults(keepPage = false) {
             ? `<span class="meta-item meta-status-abolished">有變更/廢止說明</span>`
             : `<span class="meta-item meta-status-active">有效</span>`;
 
+        // 資料來源標章
+        let sourceBadge = '';
+        if (item.資料來源) {
+            const isError = item.資料來源.includes('錯誤');
+            const badgeClass = isError ? 'meta-source-error' : 'meta-source';
+            sourceBadge = `<span class="meta-item ${badgeClass}">${escapeHtml(item.資料來源)}</span>`;
+        }
+
         // 關鍵字高亮處理
         let displayTitle = escapeHtml(item.主題 || '');
         if (searchCriteria.title) {
@@ -338,6 +436,7 @@ function renderResults(keepPage = false) {
             <div class="card-header">
                 <div class="card-summary-left">
                     <div class="card-meta-row">
+                        ${sourceBadge}
                         <span class="meta-item meta-doc-num">${escapeHtml(item.發文字號 || '無發文字號')}</span>
                         <span class="meta-item meta-article">${escapeHtml(item.依據採購法條文 || '政府採購法綜合')}</span>
                         <span class="meta-item meta-date">${displayDate}</span>
@@ -563,14 +662,15 @@ async function callGeminiAPI(question) {
     const model = 'gemini-2.0-flash';
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`;
 
-    const prompt = `你是一位專業的台灣政府採購法專家。請分析使用者提出的口語問題，提取出最相關的搜尋條件。
+    const dbContext = currentDatabase === 'rulings' ? '採購法解釋令與函釋' : '採購錯誤行為態樣';
+    const prompt = `你是一位專業的台灣政府採購法專家。目前檢索的資料庫為「${dbContext}」。請分析使用者提出的口語問題，提取出最相關的搜尋條件。
     
 請嚴格以下列的 JSON 格式回傳（不要包含任何 Markdown 格式框，僅回傳 JSON 內容）：
 {
   "article": "採購法具體條文，例如：第22條、第22條第1項第9款。如無則為空字串",
   "titleKeywords": "核心主題關鍵字（1-2個，以空白分隔），例如：限制性招標。如無則為空字串",
   "contentKeywords": "全文內容關鍵字（1-2個，以空白分隔），例如：公告金額 最有利標。如無則為空字串",
-  "summary": "針對此問題的一句話簡短分析導讀與回答，說明應該參考哪些條文或函釋方向（不超過 100 字）"
+  "summary": "針對此問題的一句話簡短分析導讀與回答，說明應該參考哪些條文或函釋/錯誤態樣方向（不超過 100 字）"
 }
 
 使用者問題：「${question}」
@@ -804,7 +904,7 @@ function localSemanticParse(question) {
         result.article = matchedArticles[0].replace(/\s+/g, '');
     }
 
-    // 3. 基於採購法常用詞庫對照表提取關鍵字
+    // 3. 基於採購法與錯誤態樣常用詞庫對照表提取關鍵字
     const keywordsDict = {
         // 主題關鍵字 (對位至「主題關鍵字」欄位)
         '限制性招標': ['限制性招標', '限制性', '協商改採限制性招標', '招標方式變更'],
@@ -828,7 +928,15 @@ function localSemanticParse(question) {
         '契約變更': ['契約變更', '變更契約', '變更設計', '契約修改', '追加預算', '減價收受'],
         '驗收': ['驗收', '部分驗收', '驗收不符', '驗收程序', '主驗人', '會驗人'],
         '逾期違約金': ['逾期違約金', '逾期', '違約金', '罰款', '扣款', '遲延履約'],
-        '保固': ['保固', '保固金', '保固期', '保固責任']
+        '保固': ['保固', '保固金', '保固期', '保固責任'],
+        
+        // 錯誤態樣額外對照詞
+        '招標文件': ['招標文件', '招標資料', '招標規範', '招標準備'],
+        '押標金': ['押標金', '投標保證金'],
+        '保證金': ['履約保證金', '差額保證金', '保證金'],
+        '審標': ['審標', '不合格標', '合格標', '投標文件審查'],
+        '決標': ['決標', '廢標', '流標'],
+        '錯誤態樣': ['錯誤行為', '錯誤態樣', '錯誤類型', '違法行為']
     };
 
     const matchedKws = [];
