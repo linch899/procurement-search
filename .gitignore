@@ -21,6 +21,7 @@ __pycache__/
 
 # Raw JSON source file (uncomment if you want to keep the raw 7.3MB database out of git)
 gplAll_*.json
+gplError_*.json
 
 # Exclude GitHub setup skill guidelines
 GITHUB_SKILL.md
